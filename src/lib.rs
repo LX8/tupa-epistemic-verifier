@@ -258,6 +258,120 @@ pub fn sha256_hex(data: &[u8]) -> String {
     out
 }
 
+/// Evaluates 5-order (`d = 0..4`) escape-interpolated Krichevsky–Trofimov / Vovk Bayesian mixture
+/// lossless code length (`bits/byte`) on arbitrary byte stream `data`, returning
+/// `(order0_bpb, vovk_mix_bpb, vovk_regret_margin_bits)`.
+pub fn vovk_ctw_compress_rate_bpb(data: &[u8], dirichlet_alpha: f64) -> (f64, f64, f64) {
+    if data.is_empty() {
+        return (0.0, 0.0, 0.0);
+    }
+    let ln2 = LN2;
+    let alpha = dirichlet_alpha.clamp(0.01, 4.0);
+    let mut order0_counts = [0u32; 256];
+    let mut order0_total: u64 = 0;
+    let mut ctx_totals: std::collections::HashMap<u64, u32> = std::collections::HashMap::new();
+    let mut sym_counts: std::collections::HashMap<u64, u32> = std::collections::HashMap::new();
+
+    let mut log_weights = [0.0f64; 5];
+    let mut cum_expert_bits = [0.0f64; 5];
+    let mut cum_mix_bits = 0.0f64;
+
+    for (t, &byte) in data.iter().enumerate() {
+        let sym = byte as usize;
+        let max_lw = log_weights
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        let mut w_norm = [0.0f64; 5];
+        let mut w_sum = 0.0f64;
+        for d in 0..5 {
+            w_norm[d] = (log_weights[d] - max_lw).exp();
+            w_sum += w_norm[d];
+        }
+        for d in 0..5 {
+            w_norm[d] /= w_sum;
+        }
+
+        let mut d_ctx_key = [0u64; 5];
+        let mut rolling: u64 = 0xCBF2_9CE4_8422_2325;
+        for d in 1..=4 {
+            if t >= d {
+                rolling = (rolling ^ ((data[t - d] as u64) + 1)).wrapping_mul(0x0100_0000_01B3);
+                d_ctx_key[d] = ((d as u64) << 56) | (rolling & 0x00FF_FFFF_FFFF_FFFF);
+            }
+        }
+
+        let mut p_d = [0.0f64; 5];
+        p_d[0] = ((order0_counts[sym] as f64) + alpha) / ((order0_total as f64) + 256.0 * alpha);
+        for d in 1..=4 {
+            if t < d {
+                p_d[d] = p_d[d - 1];
+            } else {
+                let n_ctx = *ctx_totals.get(&d_ctx_key[d]).unwrap_or(&0);
+                if n_ctx == 0 {
+                    p_d[d] = p_d[d - 1];
+                } else {
+                    let skey = d_ctx_key[d].wrapping_mul(257) ^ (sym as u64);
+                    let c_sym = *sym_counts.get(&skey).unwrap_or(&0);
+                    let esc = alpha / ((n_ctx as f64) + alpha);
+                    p_d[d] = ((c_sym as f64) / ((n_ctx as f64) + alpha)) + esc * p_d[d - 1];
+                }
+            }
+        }
+
+        let mut p_mix = 0.0f64;
+        for d in 0..5 {
+            p_mix += w_norm[d] * p_d[d];
+        }
+        cum_mix_bits += -p_mix.max(1.0e-300).ln() / ln2;
+
+        for d in 0..5 {
+            let loss_d = -p_d[d].max(1.0e-300).ln() / ln2;
+            cum_expert_bits[d] += loss_d;
+            log_weights[d] -= ln2 * loss_d;
+        }
+
+        order0_counts[sym] += 1;
+        order0_total += 1;
+        for d in 1..=4 {
+            if t >= d {
+                *ctx_totals.entry(d_ctx_key[d]).or_insert(0) += 1;
+                let skey = d_ctx_key[d].wrapping_mul(257) ^ (sym as u64);
+                *sym_counts.entry(skey).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let n = data.len() as f64;
+    let min_expert = cum_expert_bits
+        .iter()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+    let regret_margin = ((5.0f64).ln() / ln2) - (cum_mix_bits - min_expert);
+    (cum_expert_bits[0] / n, cum_mix_bits / n, regret_margin)
+}
+
+/// Fail-closed detector for synthetic/placeholder DOI and arXiv hallucinations commonly emitted by LLMs.
+pub fn detect_synthetic_citation_hallucination(text: &str) -> Vec<String> {
+    let mut flags = Vec::new();
+    let lower = text.to_lowercase();
+    for pat in [
+        "10.1234/",
+        "10.0000/",
+        "10.9999/",
+        "10.xxxx/",
+        "arxiv:0000.00000",
+        "arxiv:1234.56789",
+        "arxiv:9999.",
+        "doi:10.1000/xyz",
+    ] {
+        if lower.contains(pat) {
+            flags.push(format!("synthetic citation pattern '{}'", pat));
+        }
+    }
+    flags
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +432,19 @@ mod tests {
         );
         assert!(validate_orcid_iso7064("0009-0009-0139-3700"));
         assert!(!validate_orcid_iso7064("0009-0009-0139-3701"));
+    }
+
+    #[test]
+    fn test_vovk_ctw_compression_and_regret_theorem() {
+        let sample = "<page><title>Epistemic Verification</title><text>Local-first reproducible Rust verification eliminates zombie claims and uncalibrated confidence.</text></page>".repeat(6);
+        let (bpb0, bpb_mix, margin) = vovk_ctw_compress_rate_bpb(sample.as_bytes(), 0.50);
+        assert!(bpb_mix < bpb0 * 0.55, "5-order Vovk/CTW ({}) must compress structured XML well below order-0 ({})", bpb_mix, bpb0);
+        assert!(margin >= -1.0e-9, "Vovk universal regret <= log2(5) violated: margin={}", margin);
+    }
+
+    #[test]
+    fn test_synthetic_citation_hallucination_blocker() {
+        assert!(detect_synthetic_citation_hallucination("arXiv:2509.24593 and doi:10.1103/PhysRevD.38.472").is_empty());
+        assert_eq!(detect_synthetic_citation_hallucination("See doi:10.1234/fake-llm-paper and arXiv:0000.00000").len(), 2);
     }
 }
