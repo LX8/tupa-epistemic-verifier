@@ -1,0 +1,13 @@
+[package]
+name = "tupa-epistemic-verifier"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+authors = ["Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"]
+description = "Zero-dependency local-first Rust/WebAssembly epistemic verifier: LogSumExp calibrated cross-entropy, Savage-Bregman Tsallis q-scores, Jensen-Shannon & Fisher-Rao geometry, Doyle non-monotonic JTMS truth maintenance, and FIPS 180-4 SHA-256 provenance."
+repository = "https://github.com/LX8/tupa-epistemic-verifier"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]

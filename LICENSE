@@ -1,0 +1,60 @@
+Bipartite Universe Corpus — License Index
+=========================================
+
+Copyright (c) 2026 Alexei Lemos Cavalcante Ferreira
+                   <ferreira.alexei@gmail.com>
+                   ORCID: 0009-0009-0139-3700
+
+
+This repository is multi-licensed. Different file types are governed
+by different SPDX-identified licenses, chosen to match the norms of
+each content type:
+
+  • Manuscripts, prose, audit deliverables (.md, .tex, .pdf, plain
+    prose) — Creative Commons Attribution-ShareAlike 4.0 International
+    (CC BY-SA 4.0). Copyleft: derivatives must also be CC BY-SA 4.0.
+    Canonical text: LICENSES/CC-BY-SA-4.0.txt
+
+  • Code (.py, .sh, .ipynb, Makefile, CI workflows) — GNU General
+    Public License version 3.0 or later (GPL-3.0-or-later). Copyleft:
+    derivatives that link or integrate this code must release source
+    under GPL-3.0-or-later.
+    Canonical text: LICENSES/GPL-3.0-or-later.txt
+
+  • Numerical outputs and fact tables (.csv, .json, CODATA-derived
+    values) — Creative Commons Zero 1.0 Universal (CC0 1.0). Public-
+    domain dedication.
+    Canonical text: LICENSES/CC0-1.0.txt
+
+The machine-readable mapping of every file in the repository to its
+license is in REUSE.toml. The project follows the REUSE specification
+(https://reuse.software).
+
+For the author's assertion of original contributions, attribution
+expectations, AI/ML training notice, and priority record, see
+NOTICE.
+
+For contributor licensing terms (inbound = outbound, DCO sign-off),
+see CONTRIBUTING.md.
+
+
+License history
+---------------
+
+  2026-05-08 → 2026-05-14   CC BY 4.0 (single license, all content).
+                            Bookmarked at git tag
+                            v2.55.1-final-cc-by-4.0.
+
+  2026-05-15 onward         Multi-license cut-over: CC BY-SA 4.0
+                            (content) + GPL-3.0-or-later (code) +
+                            CC0 1.0 (data). Released as v3.0.
+
+  Anyone who obtained a copy of the repository under the CC BY 4.0
+  license retains all rights granted by CC BY 4.0 for that copy
+  indefinitely. The new licenses govern the v3.0-and-later state
+  only. This is the inherent property of Creative Commons and GNU
+  licenses: granted permissions are irrevocable for the version
+  that granted them.
+
+
+-- end LICENSE index --
