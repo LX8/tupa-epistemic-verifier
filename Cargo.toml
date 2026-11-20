@@ -1,10 +1,10 @@
 [package]
 name = "tupa-epistemic-verifier"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 authors = ["Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"]
-description = "Zero-dependency local-first Rust/WebAssembly epistemic verifier & CLI: LogSumExp calibrated cross-entropy, Savage-Bregman Tsallis q-scores, Vovk/CTW context-tree universal coding, Doyle non-monotonic JTMS truth maintenance, synthetic DOI/arXiv hallucination guard, and FIPS 180-4 SHA-256 provenance."
+description = "Zero-dependency local-first Rust/WebAssembly epistemic verifier & CLI: AI-generated Lean 4 formal-proof soundness & Comparator trust-boundary auditor, LogSumExp calibrated cross-entropy, Savage-Bregman Tsallis q-scores, Vovk/CTW context-tree universal coding, Doyle non-monotonic JTMS truth maintenance, synthetic DOI/arXiv hallucination guard, and FIPS 180-4 SHA-256 provenance."
 repository = "https://github.com/LX8/tupa-epistemic-verifier"
 
 [lib]

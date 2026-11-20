@@ -372,6 +372,342 @@ pub fn detect_synthetic_citation_hallucination(text: &str) -> Vec<String> {
     flags
 }
 
+/// Exact Montgomery–Taylor unconditional critical-line & distinct zero proportions
+/// from Alpöge & Furman (arXiv:2608.13637v2, formalized in `anthropics/formal-math/zeta23`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Zeta23CriticalLineBounds {
+    pub lambda_window: f64,
+    pub c_lambda_star: f64,
+    pub kappa_simple_critical_line: f64,
+    pub kappa_distinct_zeros: f64,
+    pub gain_over_five_twelfths: f64,
+}
+
+/// Computes `c*_lambda = sqrt(2) * tan(theta) / (1 + theta * tan(theta))` with `theta = lambda / sqrt(2)`,
+/// returning `(2 - 1 / c*_lambda)` for simple critical-line zeros (`0.67250463...` at `lambda = 1`)
+/// and `(3 - 1 / c*_lambda) / 2` for distinct zeros (`0.83625232...` at `lambda = 1`).
+pub fn evaluate_zeta23_montgomery_taylor_bounds(lambda_window: f64) -> Zeta23CriticalLineBounds {
+    let lam = lambda_window.clamp(0.05, 2.0);
+    let sqrt2 = core::f64::consts::SQRT_2;
+    let theta = lam / sqrt2;
+    let tan_t = theta.tan();
+    let c_star = (sqrt2 * tan_t) / (1.0 + theta * tan_t);
+    let inv_c = 1.0 / c_star;
+    let kappa_simple = 2.0 - inv_c;
+    let kappa_distinct = 0.5 * (3.0 - inv_c);
+    Zeta23CriticalLineBounds {
+        lambda_window: lam,
+        c_lambda_star: c_star,
+        kappa_simple_critical_line: kappa_simple,
+        kappa_distinct_zeros: kappa_distinct,
+        gain_over_five_twelfths: kappa_simple - (5.0 / 12.0),
+    }
+}
+
+/// Comment-stripped static soundness & metaprogramming audit of Lean 4 source files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LeanSourceStaticScan {
+    pub unsound_or_placeholder_tokens: Vec<String>,
+    pub elaborator_bypass_sites: Vec<String>,
+    pub mutual_reflexive_inductive_hint: bool,
+}
+
+/// Strips Lean 4 `-- ...` line comments, nested `/- ... -/` block comments, and string literals
+/// before scanning for soundness-compromising keywords (`sorry`, `axiom`, `native_decide`, `extern`,
+/// `implemented_by`, `unsafe`, `opaque`, `skipKernelTC`) and elaborator-bypassing metaprogramming
+/// (`MVarId.assign`, `kexactB`, `kcopy`, `elab `, `run_cmd`, `run_tac`, `partial def`).
+pub fn strip_lean4_comments_and_strings(src: &str) -> String {
+    let bytes = src.as_bytes();
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0usize;
+    let mut block_depth = 0usize;
+    let mut in_line_comment = false;
+    let mut in_string = false;
+
+    while i < bytes.len() {
+        if in_line_comment {
+            if bytes[i] == b'\n' {
+                in_line_comment = false;
+                out.push('\n');
+            }
+            i += 1;
+            continue;
+        }
+        if block_depth > 0 {
+            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'-' {
+                block_depth += 1;
+                i += 2;
+                continue;
+            }
+            if i + 1 < bytes.len() && bytes[i] == b'-' && bytes[i + 1] == b'/' {
+                block_depth -= 1;
+                i += 2;
+                out.push(' ');
+                continue;
+            }
+            if bytes[i] == b'\n' {
+                out.push('\n');
+            }
+            i += 1;
+            continue;
+        }
+        if in_string {
+            if bytes[i] == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if bytes[i] == b'"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if i + 1 < bytes.len() && bytes[i] == b'-' && bytes[i + 1] == b'-' {
+            in_line_comment = true;
+            i += 2;
+            continue;
+        }
+        if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'-' {
+            block_depth = 1;
+            i += 2;
+            continue;
+        }
+        if bytes[i] == b'"' {
+            in_string = true;
+            out.push(' ');
+            i += 1;
+            continue;
+        }
+        let ch = src[i..].chars().next().unwrap_or(' ');
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    out
+}
+
+fn contains_ident_word(haystack: &str, word: &str) -> bool {
+    let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'\'';
+    let hb = haystack.as_bytes();
+    let wb = word.as_bytes();
+    if wb.is_empty() || wb.len() > hb.len() {
+        return false;
+    }
+    let mut pos = 0usize;
+    while let Some(rel) = haystack[pos..].find(word) {
+        let idx = pos + rel;
+        let left_ok = idx == 0 || !is_ident(hb[idx - 1]);
+        let right_idx = idx + wb.len();
+        let right_ok = right_idx >= hb.len() || !is_ident(hb[right_idx]);
+        if left_ok && right_ok {
+            return true;
+        }
+        pos = idx + 1;
+    }
+    false
+}
+
+/// Scans an untrusted Lean 4 solution module (outside the trusted `Challenge.lean` spec).
+pub fn scan_lean4_solution_source(src: &str) -> LeanSourceStaticScan {
+    let stripped = strip_lean4_comments_and_strings(src);
+    // Also strip comments while retaining quoted tactic syntax names (e.g. `elab "kexactB"`)
+    let mut no_comments = String::with_capacity(src.len());
+    {
+        let bytes = src.as_bytes();
+        let mut i = 0usize;
+        let mut block_depth = 0usize;
+        let mut in_line = false;
+        while i < bytes.len() {
+            if in_line {
+                if bytes[i] == b'\n' {
+                    in_line = false;
+                    no_comments.push('\n');
+                }
+                i += 1;
+                continue;
+            }
+            if block_depth > 0 {
+                if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'-' {
+                    block_depth += 1;
+                    i += 2;
+                    continue;
+                }
+                if i + 1 < bytes.len() && bytes[i] == b'-' && bytes[i + 1] == b'/' {
+                    block_depth -= 1;
+                    i += 2;
+                    no_comments.push(' ');
+                    continue;
+                }
+                i += 1;
+                continue;
+            }
+            if i + 1 < bytes.len() && bytes[i] == b'-' && bytes[i + 1] == b'-' {
+                in_line = true;
+                i += 2;
+                continue;
+            }
+            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'-' {
+                block_depth = 1;
+                i += 2;
+                continue;
+            }
+            let ch = src[i..].chars().next().unwrap_or(' ');
+            no_comments.push(ch);
+            i += ch.len_utf8();
+        }
+    }
+
+    let mut unsound = Vec::new();
+    for kw in [
+        "sorry",
+        "sorryAx",
+        "admit",
+        "axiom",
+        "constant",
+        "opaque",
+        "native_decide",
+        "skipKernelTC",
+        "unsafe",
+    ] {
+        if contains_ident_word(&stripped, kw) {
+            unsound.push(kw.to_string());
+        }
+    }
+    for attr in ["@[extern", "@[implemented_by", "debug.skipKernelTC"] {
+        if stripped.contains(attr) {
+            unsound.push(attr.to_string());
+        }
+    }
+
+    let mut bypass = Vec::new();
+    for meta_kw in ["MVarId.assign", "kexactB", "kcopy", "run_cmd", "run_tac"] {
+        if contains_ident_word(&stripped, meta_kw)
+            || stripped.contains(meta_kw)
+            || no_comments.contains(&format!("\"{}\"", meta_kw))
+        {
+            bypass.push(meta_kw.to_string());
+        }
+    }
+    if contains_ident_word(&stripped, "elab") {
+        bypass.push("elab".to_string());
+    }
+    if stripped.contains("partial def ") {
+        bypass.push("partial def".to_string());
+    }
+
+    let mutual_reflexive = stripped.contains("mutual") && stripped.contains("inductive ");
+    LeanSourceStaticScan {
+        unsound_or_placeholder_tokens: unsound,
+        elaborator_bypass_sites: bypass,
+        mutual_reflexive_inductive_hint: mutual_reflexive,
+    }
+}
+
+/// Parses a `lean-toolchain` string such as `"leanprover/lean4:v4.33.1"` or `"v4.34.1"` into `(major, minor, patch)`.
+pub fn parse_lean_toolchain_semver(toolchain: &str) -> Option<(u32, u32, u32)> {
+    let tail = toolchain
+        .trim()
+        .rsplit(':')
+        .next()
+        .unwrap_or(toolchain)
+        .trim()
+        .trim_start_matches('v');
+    let core_part = tail.split('-').next().unwrap_or(tail);
+    let mut parts = core_part.split('.');
+    let major = parts.next()?.parse::<u32>().ok()?;
+    let minor = parts.next()?.parse::<u32>().ok()?;
+    let patch = parts.next().unwrap_or("0").parse::<u32>().ok()?;
+    Some((major, minor, patch))
+}
+
+/// Trust-boundary adjudication for large AI-assisted Lean 4 formal proof submissions
+/// (modeled on the Palomar / `leanprover/comparator` + `nanoda` protocol).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LeanFormalSubmissionVerdict {
+    pub status: &'static str,
+    pub accepted_as_machine_verified: bool,
+    pub kernel_runtime_cve_exposed: bool,
+    pub requires_external_kernel_replay: bool,
+    pub reasons: Vec<String>,
+}
+
+/// Evaluates whether an AI-generated Lean 4 submission can be promoted to `MACHINE_VERIFIED`
+/// or must remain fail-closed (`REJECTED_UNSOUND` or `UNVERIFIED_PENDING_EXTERNAL_KERNEL_REPLAY`).
+pub fn adjudicate_lean4_submission_trust_boundary(
+    lean_toolchain: &str,
+    scan: &LeanSourceStaticScan,
+    challenge_imports_mathlib_only: bool,
+    only_standard_three_axioms: bool,
+    external_comparator_436_passed: bool,
+    external_nanoda_passed: bool,
+) -> LeanFormalSubmissionVerdict {
+    let mut reasons = Vec::new();
+    if !challenge_imports_mathlib_only {
+        reasons.push("Challenge module imports untrusted modules beyond Mathlib".to_string());
+    }
+    if !only_standard_three_axioms {
+        reasons.push("Export depends on axioms outside {propext, Quot.sound, Classical.choice}".to_string());
+    }
+    if !scan.unsound_or_placeholder_tokens.is_empty() {
+        reasons.push(format!(
+            "Solution contains unsound/placeholder tokens: {}",
+            scan.unsound_or_placeholder_tokens.join(", ")
+        ));
+    }
+    if !reasons.is_empty() {
+        return LeanFormalSubmissionVerdict {
+            status: "REJECTED_UNSOUND_OR_INCOMPLETE",
+            accepted_as_machine_verified: false,
+            kernel_runtime_cve_exposed: false,
+            requires_external_kernel_replay: true,
+            reasons,
+        };
+    }
+
+    let semver = parse_lean_toolchain_semver(lean_toolchain).unwrap_or((4, 0, 0));
+    // Lean < 4.32.2 had #14576 (wrong-structure projections proving False);
+    // Lean < 4.34.1 lacks runtime soundness fixes #15241 and #15289.
+    let pre_14576 = semver < (4, 32, 2);
+    let runtime_cve_15241_15289 = semver < (4, 34, 1);
+    let has_elab_bypass = !scan.elaborator_bypass_sites.is_empty();
+    let needs_external_replay = pre_14576 || runtime_cve_15241_15289 || has_elab_bypass;
+
+    if pre_14576 {
+        reasons.push(format!(
+            "Toolchain {} predates Lean 4.32.2 kernel projection soundness fix (#14576)",
+            lean_toolchain
+        ));
+    } else if runtime_cve_15241_15289 {
+        reasons.push(format!(
+            "Toolchain {} predates Lean 4.34.1 runtime soundness fixes (#15241, #15289)",
+            lean_toolchain
+        ));
+    }
+    if has_elab_bypass {
+        reasons.push(format!(
+            "Elaborator-bypassing metaprogramming present ({}) — kernel replay is mandatory",
+            scan.elaborator_bypass_sites.join(", ")
+        ));
+    }
+
+    if needs_external_replay && !(external_comparator_436_passed && external_nanoda_passed) {
+        return LeanFormalSubmissionVerdict {
+            status: "UNVERIFIED_PENDING_EXTERNAL_KERNEL_REPLAY",
+            accepted_as_machine_verified: false,
+            kernel_runtime_cve_exposed: pre_14576 || runtime_cve_15241_15289,
+            requires_external_kernel_replay: true,
+            reasons,
+        };
+    }
+
+    LeanFormalSubmissionVerdict {
+        status: "MACHINE_VERIFIED_MULTI_KERNEL",
+        accepted_as_machine_verified: true,
+        kernel_runtime_cve_exposed: pre_14576 || runtime_cve_15241_15289,
+        requires_external_kernel_replay: needs_external_replay,
+        reasons,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -446,5 +782,86 @@ mod tests {
     fn test_synthetic_citation_hallucination_blocker() {
         assert!(detect_synthetic_citation_hallucination("arXiv:2509.24593 and doi:10.1103/PhysRevD.38.472").is_empty());
         assert_eq!(detect_synthetic_citation_hallucination("See doi:10.1234/fake-llm-paper and arXiv:0000.00000").len(), 2);
+    }
+
+    #[test]
+    fn test_zeta23_montgomery_taylor_exact_constants_and_monotonicity() {
+        let mt = evaluate_zeta23_montgomery_taylor_bounds(1.0);
+        // Exact algebraic identity: 1/c_1* = 1/2 + cot(1/sqrt(2)) / sqrt(2)
+        let theta = 1.0 / core::f64::consts::SQRT_2;
+        let inv_c_exact = 0.5 + 1.0 / (core::f64::consts::SQRT_2 * theta.tan());
+        assert!(((1.0 / mt.c_lambda_star) - inv_c_exact).abs() < 1.0e-14);
+        assert!((mt.c_lambda_star - 0.7532960678560707).abs() < 1.0e-14);
+        assert!((mt.kappa_simple_critical_line - 0.6725007036794117).abs() < 1.0e-14);
+        assert!((mt.kappa_distinct_zeros - 0.8362503518397059).abs() < 1.0e-14);
+        assert!(mt.kappa_simple_critical_line > 2.0 / 3.0);
+        assert!(mt.kappa_distinct_zeros > 5.0 / 6.0);
+        assert!(mt.gain_over_five_twelfths > 0.2558);
+    }
+
+    #[test]
+    fn test_lean4_source_scanner_ignores_comments_and_catches_sorry_native_decide_and_kexactb() {
+        let clean_with_comments = r#"
+/- This block comment mentions sorry and native_decide and @[extern "c"] -/
+-- Single-line comment mentioning axiom and skipKernelTC
+theorem riemannHypothesis : RiemannHypothesis := rhOfAll
+"#;
+        let s_clean = scan_lean4_solution_source(clean_with_comments);
+        assert!(s_clean.unsound_or_placeholder_tokens.is_empty());
+        assert!(s_clean.elaborator_bypass_sites.is_empty());
+
+        let meta_bypass = r#"
+elab "kexactB" t:term : tactic => do
+  MVarId.assign goal expr
+"#;
+        let s_meta = scan_lean4_solution_source(meta_bypass);
+        assert!(s_meta.unsound_or_placeholder_tokens.is_empty());
+        assert!(s_meta.elaborator_bypass_sites.contains(&"kexactB".to_string()));
+        assert!(s_meta.elaborator_bypass_sites.contains(&"MVarId.assign".to_string()));
+
+        let unsound_src = "theorem fake : RiemannHypothesis := by sorry\n#eval native_decide";
+        let s_bad = scan_lean4_solution_source(unsound_src);
+        assert!(s_bad.unsound_or_placeholder_tokens.contains(&"sorry".to_string()));
+        assert!(s_bad.unsound_or_placeholder_tokens.contains(&"native_decide".to_string()));
+    }
+
+    #[test]
+    fn test_lean4_submission_auditor_distinguishes_zeta23_verified_vs_rh_2026_11_20_pending() {
+        // 1. Alpöge-Furman zeta23 (arXiv:2608.13637v2): Comparator + nanoda replayed -> MACHINE_VERIFIED_MULTI_KERNEL
+        let zeta23_scan = LeanSourceStaticScan {
+            unsound_or_placeholder_tokens: vec![],
+            elaborator_bypass_sites: vec![],
+            mutual_reflexive_inductive_hint: false,
+        };
+        let v_zeta23 = adjudicate_lean4_submission_trust_boundary(
+            "leanprover/lean4:v4.33.0-rc2",
+            &zeta23_scan,
+            true,
+            true,
+            true,
+            true,
+        );
+        assert!(v_zeta23.accepted_as_machine_verified);
+        assert_eq!(v_zeta23.status, "MACHINE_VERIFIED_MULTI_KERNEL");
+
+        // 2. Alpöge-Claude RH/GRH archive (2026-11-20, Lean v4.33.1, 0 sorry, kexactB/kcopy present, nanoda still running)
+        // Must stay fail-closed as UNVERIFIED_PENDING_EXTERNAL_KERNEL_REPLAY!
+        let rh_scan = LeanSourceStaticScan {
+            unsound_or_placeholder_tokens: vec![],
+            elaborator_bypass_sites: vec!["kexactB".to_string(), "kcopy".to_string(), "MVarId.assign".to_string()],
+            mutual_reflexive_inductive_hint: true,
+        };
+        let v_rh_pending = adjudicate_lean4_submission_trust_boundary(
+            "leanprover/lean4:v4.33.1",
+            &rh_scan,
+            true,
+            true,
+            false,
+            false,
+        );
+        assert!(!v_rh_pending.accepted_as_machine_verified);
+        assert!(v_rh_pending.kernel_runtime_cve_exposed);
+        assert!(v_rh_pending.requires_external_kernel_replay);
+        assert_eq!(v_rh_pending.status, "UNVERIFIED_PENDING_EXTERNAL_KERNEL_REPLAY");
     }
 }
