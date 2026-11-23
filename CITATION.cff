@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use Tupã Epistemic Verifier in research, security audits, or evaluations, please cite this software release."
+type: software
+title: "Tupã Epistemic Verifier: Zero-Dependency Rust/WebAssembly Proper-Scoring, Non-Monotonic JTMS & Lean 4 Soundness-Boundary Engine"
+version: "0.3.0"
+date-released: "2026-11-20"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/LX8/tupa-epistemic-verifier"
+url: "https://doi.org/10.5281/zenodo.24476044"
+doi: "10.5281/zenodo.24476044"
+authors:
+  - family-names: "Lemos Cavalcante Ferreira"
+    given-names: "Alexei"
+    orcid: "https://orcid.org/0009-0009-0139-3700"
+    affiliation: "Lx8 Labs (Berlin, Germany)"
+keywords:
+  - "formal verification"
+  - "Lean 4"
+  - "AI safety"
+  - "Rust"
+  - "WebAssembly"
+  - "truth maintenance"
+  - "proper scoring rules"
+  - "W3C RO-Crate"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.24476043"
+    description: "Zenodo concept DOI (all versions)"
+  - type: doi
+    value: "10.5281/zenodo.24476044"
+    description: "Zenodo archive for release v0.3.0"
+  - type: doi
+    value: "10.5281/zenodo.24465984"
+    description: "Companion severe-testing preprint (Millennium Prize Problems v1.2.0)"
