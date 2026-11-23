@@ -1,5 +1,7 @@
 # Tupã Epistemic Verifier (`tupa-epistemic-verifier`)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24476044.svg)](https://doi.org/10.5281/zenodo.24476044) [![ORCID](https://img.shields.io/badge/ORCID-0009--0009--0139--3700-A6CE39)](https://orcid.org/0009-0009-0139-3700)
+
 **Local-First Open-Source Verification Engine Against AI Hallucinations, Synthetic Citations, and Uncalibrated Uncertainty (`Rust` / `WebAssembly`, `GPL-3.0-or-later`)**
 
 **Lokale Open-Source-Prüfbank gegen KI-Halluzinationen, Zitationsfälschungen und nicht-reproduzierbare Datenanalysen — ohne Cloud-Zwang, ohne GPU und ohne Datenabfluss.**
