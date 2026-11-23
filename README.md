@@ -28,3 +28,9 @@ cargo run --release -- audit-lean path/to/Solution.lean --toolchain leanprover/l
 ## License
 
 Free and Open Source Software licensed under **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)**. See [LICENSE](./LICENSE).
+
+## Project & Community
+
+- **Contributing:** See [CONTRIBUTING.md](./CONTRIBUTING.md) for zero-dependency std Rust and planted-defect test guidelines.
+- **Audited Research & Documentation:** [lx8labs.com/research](https://lx8labs.com/research/)
+- **LX8 Labs Updates:** [LinkedIn](https://www.linkedin.com/company/lx8labs) · [YouTube](https://www.youtube.com/@lx8labs)
