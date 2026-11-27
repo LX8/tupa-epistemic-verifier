@@ -1,22 +1,25 @@
 cff-version: 1.2.0
-message: "If you use Tupã Epistemic Verifier in research, security audits, or evaluations, please cite this software release."
+message: "If you use Tupã Epistemic Verifier in research, security audits, or biomolecular/formal verification, please cite this software release."
 type: software
-title: "Tupã Epistemic Verifier: Zero-Dependency Rust/WebAssembly Proper-Scoring, Non-Monotonic JTMS & Lean 4 Soundness-Boundary Engine"
-version: "0.3.0"
-date-released: "2026-11-20"
+title: "Tupã Epistemic Verifier: Zero-Dependency Rust/WebAssembly Severe Testing for Scientific Provenance, Formal Proofs, and Biomolecular Audits"
+version: "0.4.0"
+date-released: "2026-11-27"
 license: GPL-3.0-or-later
 repository-code: "https://github.com/LX8/tupa-epistemic-verifier"
-url: "https://doi.org/10.5281/zenodo.24476044"
-doi: "10.5281/zenodo.24476044"
+url: "https://doi.org/10.5281/zenodo.24476043"
+doi: "10.5281/zenodo.24476043"
 authors:
   - family-names: "Lemos Cavalcante Ferreira"
     given-names: "Alexei"
     orcid: "https://orcid.org/0009-0009-0139-3700"
-    affiliation: "Lx8 Labs (Berlin, Germany)"
+    affiliation: "LX8 Labs (Berlin, Germany)"
 keywords:
   - "formal verification"
   - "Lean 4"
-  - "AI safety"
+  - "structural biology"
+  - "AlphaFold verification"
+  - "lDDT"
+  - "3D pharmacophore"
   - "Rust"
   - "WebAssembly"
   - "truth maintenance"

@@ -16,6 +16,13 @@
 //!    an upstream source or dataset is refuted.
 //! 3. **Cryptographic Provenance & Identifier Hygiene:**
 //!    Pure-`std` FIPS 180-4 SHA-256 digesting and ISO 7064 MOD 11-2 ORCID checksum verification.
+//! 4. **Biomolecular Structure & 3D Physical-Field Verification (`structural`):**
+//!    Pure-`std` mmCIF parsing, exact Mariani (2013) `lDDT-Ca` vs. `pLDDT` calibration,
+//!    Ramachandran & steric-clash auditing, Grant–Pickup Gaussian 3D shape & Coulombic ESP
+//!    Tanimoto / Hodgkin fields, directional pharmacophores, and tetrahedral chirality guards.
+
+pub mod structural;
+pub use structural::*;
 
 const LN2: f64 = core::f64::consts::LN_2;
 
