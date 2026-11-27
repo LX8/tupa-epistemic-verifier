@@ -1,0 +1,47 @@
+version = 1
+SPDX-PackageName = "tupa-epistemic-verifier"
+SPDX-PackageSupplier = "Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"
+SPDX-PackageDownloadLocation = "https://github.com/LX8/tupa-epistemic-verifier"
+
+[[annotations]]
+path = [
+    "src/**",
+    "Cargo.toml",
+    ".github/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = [
+    "paper/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = [
+    "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "ETHICS.md",
+    "docs/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+[[annotations]]
+path = [
+    "CITATION.cff",
+    "codemeta.json",
+    "Cargo.lock",
+    ".gitignore",
+    "LICENSE",
+    "REUSE.toml",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexei Lemos Cavalcante Ferreira <ferreira.alexei@gmail.com>"
+SPDX-License-Identifier = "CC0-1.0"

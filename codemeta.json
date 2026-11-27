@@ -1,0 +1,54 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "Tupã Epistemic Verifier",
+  "version": "0.4.0",
+  "datePublished": "2026-11-27",
+  "description": "Zero-dependency local-first Rust/WebAssembly severe-testing verifier and CLI for Lean 4 formal-proof trust boundaries, proper scoring rules, Vovk/CTW coding, Doyle JTMS, FIPS 180-4 SHA-256 provenance, mmCIF protein lDDT-Ca calibration, and 3D ligand Shape/ESP/Pharmacophore/Chirality auditing.",
+  "codeRepository": "https://github.com/LX8/tupa-epistemic-verifier",
+  "issueTracker": "https://github.com/LX8/tupa-epistemic-verifier/issues",
+  "identifier": "https://doi.org/10.5281/zenodo.24476043",
+  "url": "https://github.com/LX8/tupa-epistemic-verifier",
+  "programmingLanguage": [
+    "Rust",
+    "WebAssembly"
+  ],
+  "operatingSystem": [
+    "Linux",
+    "macOS",
+    "Windows",
+    "WASI"
+  ],
+  "license": [
+    "https://spdx.org/licenses/GPL-3.0-or-later",
+    "https://spdx.org/licenses/CC-BY-4.0",
+    "https://spdx.org/licenses/CC-BY-SA-4.0",
+    "https://spdx.org/licenses/CC0-1.0"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0009-0009-0139-3700",
+      "givenName": "Alexei",
+      "familyName": "Lemos Cavalcante Ferreira",
+      "email": "ferreira.alexei@gmail.com",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "LX8 Labs (Berlin, Germany)"
+      }
+    }
+  ],
+  "keywords": [
+    "formal verification",
+    "Lean 4",
+    "structural biology",
+    "AlphaFold verification",
+    "lDDT",
+    "3D pharmacophore",
+    "Rust",
+    "WebAssembly",
+    "severe testing",
+    "REUSE 3.3",
+    "W3C RO-Crate"
+  ]
+}
