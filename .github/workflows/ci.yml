@@ -14,7 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run release unit and severe-testing mutant suite
+      - name: Verify FSFE REUSE 3.3 licensing & SPDX compliance
+        uses: fsfe/reuse-action@v5
+      - name: Validate codemeta.json syntax
+        run: jq empty codemeta.json
+      - name: Run release unit, manifest-parity, and severe-testing mutant suite
+        env:
+          RUSTFLAGS: "-D warnings"
         run: cargo test --release
       - name: Run offline CLI self-checks (default, Lean 4 / Riemann, biomolecular severe-testing)
         run: |
@@ -22,6 +28,8 @@ jobs:
           cargo run --release -- riemann-audit
           cargo run --release -- structural-selftest
       - name: Verify zero-dependency WebAssembly library compilation
+        env:
+          RUSTFLAGS: "-D warnings"
         run: |
           rustup target add wasm32-unknown-unknown
           cargo check --release --target wasm32-unknown-unknown --lib

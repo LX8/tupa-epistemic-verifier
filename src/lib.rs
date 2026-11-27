@@ -871,4 +871,100 @@ elab "kexactB" t:term : tactic => do
         assert!(v_rh_pending.requires_external_kernel_replay);
         assert_eq!(v_rh_pending.status, "UNVERIFIED_PENDING_EXTERNAL_KERNEL_REPLAY");
     }
+
+    #[test]
+    fn test_manifest_parity_live_repo_and_planted_drift_mutant() {
+        let cargo_toml = include_str!("../Cargo.toml");
+        let citation_cff = include_str!("../CITATION.cff");
+        let codemeta_json = include_str!("../codemeta.json");
+        let reuse_toml = include_str!("../REUSE.toml");
+        let security_md = include_str!("../SECURITY.md");
+        let ethics_md = include_str!("../ETHICS.md");
+
+        let ver = verify_manifest_parity(cargo_toml, citation_cff, codemeta_json)
+            .expect("live Cargo.toml, CITATION.cff, and codemeta.json must match version, ORCID, and DOI invariants");
+        assert_eq!(ver, env!("CARGO_PKG_VERSION"));
+        assert!(reuse_toml.contains("GPL-3.0-or-later") && reuse_toml.contains("CC-BY-4.0"));
+        assert!(security_md.contains("EU MDR 2017/745") && security_md.contains("2024/2847"));
+        assert!(ethics_md.contains("Layer 1") && ethics_md.contains("Layer 5"));
+
+        // Negative-control mutant 1: drifted codemeta.json version must fail closed
+        let drifted_codemeta = codemeta_json.replacen(&ver, "0.3.9", 1);
+        let err_drift = verify_manifest_parity(cargo_toml, citation_cff, &drifted_codemeta).unwrap_err();
+        assert!(err_drift.iter().any(|e| e.contains("version drift")), "expected drift failure, got {:?}", err_drift);
+
+        // Negative-control mutant 2: corrupted ISO 7064 ORCID check digit must fail closed
+        let bad_orcid_cff = citation_cff.replace("0009-0009-0139-3700", "0009-0009-0139-3701");
+        let err_orcid = verify_manifest_parity(cargo_toml, &bad_orcid_cff, codemeta_json).unwrap_err();
+        assert!(err_orcid.iter().any(|e| e.contains("ORCID")), "expected ORCID failure, got {:?}", err_orcid);
+    }
+}
+
+/// Zero-dependency software supply-chain parity verifier across `Cargo.toml`, `CITATION.cff`, and `codemeta.json`.
+/// Checks exact version parity, ISO 7064 ORCID check digits, and synthetic DOI/arXiv hallucination patterns.
+pub fn verify_manifest_parity(
+    cargo_toml: &str,
+    citation_cff: &str,
+    codemeta_json: &str,
+) -> Result<String, Vec<String>> {
+    let mut errors = Vec::new();
+
+    let extract_quoted_after = |text: &str, needle: &str| -> Option<String> {
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix(needle) {
+                let val = rest.trim().trim_start_matches(['=', ':']).trim();
+                if let Some(stripped) = val.strip_prefix('"') {
+                    if let Some(end) = stripped.find('"') {
+                        return Some(stripped[..end].to_string());
+                    }
+                }
+            }
+        }
+        None
+    };
+
+    let v_cargo = extract_quoted_after(cargo_toml, "version");
+    let v_cff = extract_quoted_after(citation_cff, "version:");
+    let v_meta = extract_quoted_after(codemeta_json, "\"version\"");
+
+    match (&v_cargo, &v_cff, &v_meta) {
+        (Some(a), Some(b), Some(c)) => {
+            if a != b || a != c {
+                errors.push(format!(
+                    "manifest version drift: Cargo.toml={a}, CITATION.cff={b}, codemeta.json={c}"
+                ));
+            }
+        }
+        _ => errors.push(format!(
+            "missing version field across manifests: Cargo.toml={v_cargo:?}, CITATION.cff={v_cff:?}, codemeta.json={v_meta:?}"
+        )),
+    }
+
+    for (label, doc) in [("CITATION.cff", citation_cff), ("codemeta.json", codemeta_json)] {
+        let mut cursor = doc;
+        let mut found_orcid = false;
+        while let Some(pos) = cursor.find("orcid.org/") {
+            let tail = &cursor[pos + "orcid.org/".len()..];
+            let candidate: String = tail.chars().take(19).collect();
+            found_orcid = true;
+            if !validate_orcid_iso7064(&candidate) {
+                errors.push(format!("{label}: invalid ISO 7064 ORCID checksum `{candidate}`"));
+            }
+            cursor = tail;
+        }
+        if !found_orcid {
+            errors.push(format!("{label}: missing author ORCID URI"));
+        }
+        let fake_cites = detect_synthetic_citation_hallucination(doc);
+        if !fake_cites.is_empty() {
+            errors.push(format!("{label}: synthetic citation pattern detected: {fake_cites:?}"));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(v_cargo.unwrap_or_default())
+    } else {
+        Err(errors)
+    }
 }
