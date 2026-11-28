@@ -1,0 +1,30 @@
+name: Draft PDF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'paper/**'
+      - '.github/workflows/draft-pdf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    name: JOSS Inara Paper Draft
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Build official JOSS draft PDF (Inara)
+        uses: openjournals/openjournals-draft-action@master
+        with:
+          journal: joss
+          paper-path: paper/paper.md
+      - name: Upload draft PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: paper/paper.pdf
